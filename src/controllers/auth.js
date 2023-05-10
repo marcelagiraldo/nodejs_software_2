@@ -1,28 +1,35 @@
 const bcrypt = require("bcryptjs");
 const User = require("../models/user");
 const jwt = require("../utils/jwt");
+const axios = require("axios")
 
 const register = async(req,res) =>{
-    const {firstname, lastname , email, password} = req.body;
+    const {firstname, lastname , email, password,departamento,municipio} = req.body;
     if (!email) res.status(400).send({msg:"El email es requerido"})
     if (!password) res.status(400).send({msg:"La contraseña es requerida"})
     try{
+        /* Se consume la api */
         const response = await axios.get("https://www.datos.gov.co/resource/xdk5-pm3f.json")
-        const data = response.data[0]
-        console.log("Municipio: ",data.municipio,"Departamento: ",data.departamento);
+        const data = response.data
+        /* Se verifica que los datos ingresados existan en la API */
+        const dpto = data.find(item => item.departamento === departamento)
+        const muni = data.find(item => item.municipio === municipio)
+
+        if (!dpto) res.status(400).send({msg:"El departamento no existe en la API"})
+        if (!muni) res.status(400).send({msg:"El municipio no existe en la API"})
 
         const salt = bcrypt.genSaltSync(10);
         const hashPassword = bcrypt.hashSync(password,salt);
-
-
+        /* Creamos el usuario */
         const user = new User({
-            firstname,lastname,email:email.toLowerCase(),role:"user",active:false,password: hashPassword,departamento:data.departamento,municipio:data.municipio
+            firstname,lastname,email:email.toLowerCase(),role:"user",active:false,password: hashPassword,departamento,municipio
         });
 
         const userStorage = await user.save();
         res.status(201).send(userStorage);
     }catch(error){
         res.status(400).send({msg:"Error al crear el usuario",error});
+        console.error(error);
     }
 };
 
